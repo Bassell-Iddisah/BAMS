@@ -1,64 +1,115 @@
 import java.time.LocalDate;
+import java.util.LinkedList;
 import java.util.Scanner;
 
-abstract class Account {
-    // Initialize the current balance, acount number and user name of the account
-    double current_balance = 0;
-    String account_number;
-    String user_name;
-    String type;
+interface BankOperations {
+    void deposit(double amount);
+    void withdraw(double amount);
+    double getBalance();
+    void showLastNTransactions(int n);
+}
 
+abstract class Account implements BankOperations {
+    protected double currentBalance;
+    protected String accountNumber;
+    protected String userName;
+    protected String type;
+    protected LinkedList<String> transactionHistory = new LinkedList<>();
 
-    // Method for making deposits
-    void deposit(double amount) {
-        this.current_balance += amount;
-        System.out.printf("Deposit successful, your balance is now: %f", this.current_balance);
-        System.out.println();
+    public Account(String accountNumber, String userName) {
+        this.accountNumber = accountNumber;
+        this.userName = userName;
+        this.currentBalance = 0;
     }
 
-    // Method for making withdrawals
-    void withdraw(double amount) {
-        // Validate that the operation is possible.
-        if (this.current_balance == 0) {
-            System.out.println("You are broke, what? you want me to pull money from my sinks?");
-            return;
-        }
-        if (this.current_balance <= amount) {
-            System.out.printf("You do have enough funds to withdraw %f", amount);
-            System.out.println("Get Money Bro.");
-            return;
-        }
-
-        this.current_balance -= amount;
-        System.out.printf("Withdrawal Successful, you now have %f (i.e: You almost broke.)", this.current_balance);
-    };
-}
-
-class savings extends Account {
-    String type = "Savings";
-}
-
-class current extends Account {
-    String type = "Current";
-}
-
-class fixedDep extends Account {
-    String type = "Fixed Deposit";
-
-    Scanner scanner = new Scanner(System.in);
-
-    void deposit(double amount) {
-        System.out.println("Enter withdrawal date (YYYY-MM-DD) >:");
-        String input = scanner.nextLine();
-        LocalDate futureDate = LocalDate.parse(input);
+    public void deposit(double amount) {
+        currentBalance += amount;
+        transactionHistory.add("Deposited: " + amount);
+        System.out.printf("Deposit successful. New balance: %.2f%n", currentBalance);
     }
 
+    public void withdraw(double amount) {
+        if (currentBalance == 0 || currentBalance < amount) {
+            System.out.println("Insufficient funds.");
+            return;
+        }
+        currentBalance -= amount;
+        transactionHistory.add("Withdrew: " + amount);
+        System.out.printf("Withdrawal successful. New balance: %.2f%n", currentBalance);
+    }
+
+    public double getBalance() {
+        return currentBalance;
+    }
+
+    public void showLastNTransactions(int n) {
+        int start = Math.max(0, transactionHistory.size() - n);
+        for (int i = start; i < transactionHistory.size(); i++) {
+            System.out.println(transactionHistory.get(i));
+        }
+    }
 }
 
-public class BAMS {
-    public static void main(String[] args) {
+class SavingsAccount extends Account {
+    private static final double MIN_BALANCE = 100.0;
 
-         savings new_account = new savings();
-        System.out.println(new_account.current_balance);;
+    public SavingsAccount(String accountNumber, String userName) {
+        super(accountNumber, userName);
+        this.type = "Savings";
+    }
+
+    @Override
+    public void withdraw(double amount) {
+        if (currentBalance - amount < MIN_BALANCE) {
+            System.out.println("Cannot withdraw. Minimum balance must be maintained.");
+            return;
+        }
+        super.withdraw(amount);
+    }
+}
+
+class CurrentAccount extends Account {
+    private static final double OVERDRAFT_LIMIT = 500.0;
+
+    public CurrentAccount(String accountNumber, String userName) {
+        super(accountNumber, userName);
+        this.type = "Current";
+    }
+
+    @Override
+    public void withdraw(double amount) {
+        if (currentBalance - amount < -OVERDRAFT_LIMIT) {
+            System.out.println("Overdraft limit exceeded.");
+            return;
+        }
+        super.withdraw(amount);
+    }
+}
+
+class FixedDepositAccount extends Account {
+    private LocalDate maturityDate;
+
+    public FixedDepositAccount(String accountNumber, String userName, LocalDate maturityDate) {
+        super(accountNumber, userName);
+        this.type = "Fixed Deposit";
+        this.maturityDate = maturityDate;
+    }
+
+    @Override
+    public void withdraw(double amount) {
+        if (LocalDate.now().isBefore(maturityDate)) {
+            System.out.println("Cannot withdraw before maturity date: " + maturityDate);
+            return;
+        }
+        super.withdraw(amount);
+    }
+
+    @Override
+    public void deposit(double amount) {
+        if (currentBalance > 0) {
+            System.out.println("Additional deposits not allowed for Fixed Deposit Account.");
+            return;
+        }
+        super.deposit(amount);
     }
 }
